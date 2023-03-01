@@ -14,6 +14,27 @@ impl<T> LinkedList<T> {
     fn new() -> LinkedList<T> {
         LinkedList { head: None }
     }
+
+    fn add(&mut self, elem: T) {
+        let new = Some(Box::new(Node {
+            elem,
+            next: None
+        }));
+
+        if self.head.is_none() {
+            self.head = new;
+
+            return;
+        }
+
+        let mut curr = self.head.as_mut().unwrap();
+
+        while curr.next.is_some() {
+            curr = curr.next.as_mut().unwrap();
+        }
+
+        curr.next = new;
+    }
 }
 
 struct Element<T> {
@@ -32,50 +53,10 @@ impl<T, P: Ord + Hash> PQueue<T, P> {
     }
 
     fn push(&mut self, elem: T, priority: P) {
-        if !self.priority_arr.contains_key(&priority) {
-            return
-        }
-
-        let priority = self.priority_arr[&priority];
-
-        let mut curr = &mut self.elements.head;
-
-        if curr.is_none() {
-            *curr = Some(Box::new(Node {
-                elem: Element { payload: elem, priority },
-                next: None
-
-            }));
-
-            return;
-        }
-
-        if curr.as_ref().unwrap().elem.priority > priority {
-            *curr = Some(Box::new(Node {
-                elem: Element { payload: elem, priority },
-                next: curr.take()
-            }));
-
-            return;
-        }
-
-        while curr.as_ref().unwrap().next.is_some() {
-            if curr.as_ref().unwrap()
-                .next.as_ref().unwrap()
-                .elem.priority > priority
-            {
-                break
-            }
-
-            curr = &mut curr.as_mut().unwrap().next;
-        }
-
-        let new_node = Node {
-            elem: Element { payload: elem, priority },
-            next: curr.as_mut().unwrap().next.take()
-        };
-
-        curr.as_mut().unwrap().next = Some(Box::new(new_node));
+        self.elements.add(Element {
+            payload: elem,
+            priority: self.priority_arr[&priority]
+        });
     }
 
     fn pop(&mut self) -> Element<T> {
@@ -83,12 +64,24 @@ impl<T, P: Ord + Hash> PQueue<T, P> {
             panic!("Trying to pop from empty PQueue");
         }
 
-        let new_head = self.elements.head.as_mut().unwrap().next.take();
-        let elem = self.elements.head.take().unwrap().elem;
+        let mut curr = self.elements.head.as_mut().unwrap();
+        let mut min = &mut **curr as *mut Node<Element<T>>;
 
-        self.elements.head = new_head;
+        let mut min_priority = curr.elem.priority;
+        while curr.next.is_some() {
+            if curr.next.as_ref().unwrap().elem.priority < min_priority {
+                min_priority = curr.next.as_ref().unwrap().elem.priority;
+                min = &mut **curr as *mut Node<Element<T>>;
+            }
 
-        elem
+            curr = curr.next.as_mut().unwrap();
+        }
+
+        let min = unsafe { min.as_mut().unwrap() };
+        let mut res = min.next.take().unwrap();
+        min.next = res.next.take();
+
+        res.elem
     }
 }
 
@@ -100,7 +93,6 @@ fn main() {
     pqueue.priority_arr.insert("pr3", 2);
     pqueue.priority_arr.insert("pr-1", -1);
 
-    pqueue.push("elem1", "pr1");
     pqueue.push("elem3", "pr3");
     pqueue.push("elem2", "pr2");
     pqueue.push("elem1", "pr1");
@@ -114,7 +106,6 @@ fn main() {
     pqueue.push("elem3", "pr3");
     pqueue.push("elem3", "pr3");
 
-    println!("{}", pqueue.pop().payload);
     println!("{}", pqueue.pop().payload);
     println!("{}", pqueue.pop().payload);
     println!("{}", pqueue.pop().payload);
